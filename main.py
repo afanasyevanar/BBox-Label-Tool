@@ -12,11 +12,14 @@ from PIL import Image, ImageTk
 import os
 import glob
 import random
+import cv2
 
 # colors for the bboxes
 COLORS = ['red', 'blue', 'yellow', 'pink', 'cyan', 'green', 'black']
 # image sizes for the examples
 SIZE = 256, 256
+
+POSLISTFILE = 'pos.txt'
 
 class LabelTool():
     def __init__(self, master):
@@ -34,6 +37,7 @@ class LabelTool():
         self.egList = []
         self.outDir = ''
         self.cur = 0
+        self.count = 0 # counter for out images
         self.total = 0
         self.category = 0
         self.imagename = ''
@@ -129,10 +133,10 @@ class LabelTool():
 ##            tkMessageBox.showerror("Error!", message = "The specified dir doesn't exist!")
 ##            return
         # get image list
-        self.imageDir = os.path.join(r'./Images', '%03d' %(self.category))
-        self.imageList = glob.glob(os.path.join(self.imageDir, '*.JPEG'))
+        self.imageDir = os.path.join(r'./Images', '%03d' % self.category)
+        self.imageList = glob.glob(os.path.join(self.imageDir, '*.jpeg'))
         if len(self.imageList) == 0:
-            print('No .JPEG images found in the specified dir!')
+            print('No .jpeg images found in the specified dir!')
             return
 
         # default to the 1st image in the collection
@@ -140,15 +144,15 @@ class LabelTool():
         self.total = len(self.imageList)
 
          # set up output dir
-        self.outDir = os.path.join(r'./Labels', '%03d' %(self.category))
+        self.outDir = os.path.join(r'./Labels', '%03d' % self.category)
         if not os.path.exists(self.outDir):
             os.mkdir(self.outDir)
 
         # load example bboxes
-        self.egDir = os.path.join(r'./Examples', '%03d' %(self.category))
+        self.egDir = os.path.join(r'./Examples', '%03d' % self.category)
         if not os.path.exists(self.egDir):
             return
-        filelist = glob.glob(os.path.join(self.egDir, '*.JPEG'))
+        filelist = glob.glob(os.path.join(self.egDir, '*.jpeg'))
         self.tmp = []
         self.egList = []
         random.shuffle(filelist)
@@ -202,7 +206,30 @@ class LabelTool():
             f.write('%d\n' %len(self.bboxList))
             for bbox in self.bboxList:
                 f.write(' '.join(map(str, bbox)) + '\n')
-        print('Image No. %d saved' %(self.cur))
+
+        imagePath = self.imageList[self.cur - 1]
+        cvImage = cv2.imread(imagePath)
+        posFile = open(POSLISTFILE, 'a')
+        for bbox in self.bboxList:
+            x1 = bbox[0]
+            x2 = bbox[2]
+            y1 = bbox[1]
+            y2 = bbox[3]
+            fragment = cvImage[y1:y2, x1:x2]
+            fragmentPath = os.path.join(r'./Pos', '%03d' % self.category, '%d.jpg' % self.count)
+            self.count += 1
+            cv2.imwrite(fragmentPath, fragment)
+
+            posFile.write(fragmentPath+' ')
+            posFile.write('%d' % self.category)
+            posFile.write(' 0')
+            posFile.write(' 0')
+            posFile.write(' %d' % (x2-x1))
+            posFile.write(' %d' % (y2-y1) + '\n')
+        posFile.close()
+
+        print('Image No. %d saved' % self.cur)
+
 
 
     def mouseClick(self, event):
